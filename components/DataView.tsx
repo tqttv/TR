@@ -297,8 +297,9 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
       const valKV = findField(['Voltage level', 'KV', 'Voltage', 'Volts']);
 
       // Hardcoded white background class for print
+      // Adjusted height from 140mm to 135mm to better fit A4 (2 per page)
       return (
-          <div className="print-force-white border-2 border-black p-3 h-[140mm] relative flex flex-col bg-white box-border mb-4 break-inside-avoid text-left" dir="ltr">
+          <div className="print-force-white border-2 border-black p-3 h-[135mm] relative flex flex-col bg-white box-border mb-4 break-inside-avoid text-left" dir="ltr">
                <div className="flex justify-between items-end mb-2 border-b-2 border-black pb-2 shrink-0">
                   <div className="text-left">
                       <h3 className="text-gray-600 font-serif text-xs font-bold">Central Labs - Dammam</h3>
@@ -425,7 +426,8 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
     for (let i = 0; i < finalReportItems.length; i += 2) pages.push(finalReportItems.slice(i, i + 2));
 
     return (
-        <div className="fixed inset-0 z-[100] bg-gray-600/90 dark:bg-slate-900/90 overflow-y-auto backdrop-blur-sm">
+        // Key change: print attributes to breakout of fixed/scroll container
+        <div className="fixed inset-0 z-[100] bg-gray-600/90 dark:bg-slate-900/90 overflow-y-auto backdrop-blur-sm print:absolute print:inset-0 print:z-[10000] print:bg-white print:h-auto print:w-full print:overflow-visible">
             <div className="sticky top-0 left-0 right-0 bg-white dark:bg-slate-800 shadow-md z-50 px-6 py-4 flex justify-between items-center print:hidden border-b dark:border-slate-700">
                 <div dir="rtl">
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -466,7 +468,8 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
 
             <div id="report-container" className="w-[210mm] mx-auto bg-white my-8 shadow-2xl print:shadow-none print:m-0 print:w-full print:bg-white">
                 {pages.map((pageItems, pageIndex) => (
-                    <div key={pageIndex} className="w-full h-[297mm] p-[10mm] flex flex-col justify-between bg-white print:bg-white print:break-after-page relative">
+                    // Key Change: Reduce print padding to fit 2 items + break-after-page
+                    <div key={pageIndex} className="w-full h-[297mm] p-[10mm] flex flex-col justify-between bg-white print:bg-white print:p-[5mm] print:break-after-page relative">
                         {pageItems.map((reportItem) => <SingleForm key={reportItem.uniqueId} reportItem={reportItem} />)}
                     </div>
                 ))}
@@ -479,6 +482,9 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
                     .print\\:hidden { display: none !important; }
                     .print\\:bg-white { background-color: white !important; }
                     .print\\:text-black { color: black !important; }
+                    
+                    /* Hide everything else */
+                    body > *:not(#root) { display: none; }
                 }
             `}</style>
         </div>
