@@ -1,0 +1,5 @@
+{
+  "name": "Station Data Dashboard",
+  "description": "An Arabic-language dashboard to analyze station and device data from Excel files with print reporting capabilities.",
+  "requestFramePermissions": []
+}
