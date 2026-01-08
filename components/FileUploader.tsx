@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, PlayCircle, AlertTriangle } from 'lucide-react';
+import { Upload, FileSpreadsheet, Database, AlertTriangle, Loader2 } from 'lucide-react';
 import { processExcelData, generateMockData } from '../utils/excelHelpers';
 import { DeviceData } from '../types';
 
@@ -13,6 +13,74 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Core function to parse ArrayBuffer (used by both File Upload and Default File)
+  const parseExcelBuffer = (arrayBuffer: ArrayBuffer) => {
+    try {
+      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      if (wb.SheetNames.length === 0) {
+          setError("الملف فارغ لا يحتوي على أوراق عمل.");
+          return;
+      }
+
+      const allSheetsData: Record<string, DeviceData[]> = {};
+      let hasAnyData = false;
+
+      wb.SheetNames.forEach(sheetName => {
+          const ws = wb.Sheets[sheetName];
+          const rawDataArray = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+          if (rawDataArray.length === 0) return;
+
+          // Intelligent Header Detection
+          let bestHeaderRowIndex = 0;
+          let maxScore = 0;
+          let maxFilledColumns = 0;
+
+          for (let i = 0; i < Math.min(rawDataArray.length, 500); i++) {
+              const row = rawDataArray[i];
+              if (!Array.isArray(row) || row.length === 0) continue;
+
+              let score = 0;
+              const rowString = JSON.stringify(row).toLowerCase();
+              const filledColumnsCount = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').length;
+
+              if (rowString.includes('substation')) score += 30;
+              if (rowString.includes('area')) score += 30;
+              if (rowString.includes('location')) score += 20;
+              if (rowString.includes('division')) score += 20;
+              
+              if (score > maxScore) {
+                  maxScore = score;
+                  bestHeaderRowIndex = i;
+              } else if (maxScore === 0 && filledColumnsCount > maxFilledColumns) {
+                  maxFilledColumns = filledColumnsCount;
+                  bestHeaderRowIndex = i;
+              }
+          }
+
+          const data = XLSX.utils.sheet_to_json(ws, { range: bestHeaderRowIndex, defval: "" });
+          const processed = processExcelData(data);
+          
+          if (processed.length > 0) {
+              allSheetsData[sheetName] = processed;
+              hasAnyData = true;
+          }
+      });
+
+      if (!hasAnyData) {
+          setError("لم يتم العثور على بيانات صالحة في أي ورقة عمل.");
+          return;
+      }
+      
+      onDataLoaded(allSheetsData);
+
+    } catch (err) {
+      console.error(err);
+      setError("حدث خطأ أثناء معالجة البيانات.");
+    }
+  };
+
+  // 1. Handle File Upload
   const processFile = (file: File) => {
     setError(null);
     setIsProcessing(true);
@@ -21,70 +89,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
     reader.onload = (evt) => {
       try {
         const arrayBuffer = evt.target?.result;
-        const wb = XLSX.read(arrayBuffer, { type: 'array' });
-        
-        if (wb.SheetNames.length === 0) {
-            setError("الملف فارغ لا يحتوي على أوراق عمل.");
-            setIsProcessing(false);
-            return;
+        if (arrayBuffer) {
+            parseExcelBuffer(arrayBuffer as ArrayBuffer);
         }
-
-        const allSheetsData: Record<string, DeviceData[]> = {};
-        let hasAnyData = false;
-
-        wb.SheetNames.forEach(sheetName => {
-            const ws = wb.Sheets[sheetName];
-            const rawDataArray = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-            if (rawDataArray.length === 0) return;
-
-            // Intelligent Header Detection
-            let bestHeaderRowIndex = 0;
-            let maxScore = 0;
-            let maxFilledColumns = 0;
-
-            for (let i = 0; i < Math.min(rawDataArray.length, 500); i++) {
-                const row = rawDataArray[i];
-                if (!Array.isArray(row) || row.length === 0) continue;
-
-                let score = 0;
-                const rowString = JSON.stringify(row).toLowerCase();
-                const filledColumnsCount = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').length;
-
-                if (rowString.includes('substation')) score += 30;
-                if (rowString.includes('area')) score += 30;
-                if (rowString.includes('location')) score += 20;
-                if (rowString.includes('division')) score += 20;
-                
-                if (score > maxScore) {
-                    maxScore = score;
-                    bestHeaderRowIndex = i;
-                } else if (maxScore === 0 && filledColumnsCount > maxFilledColumns) {
-                    maxFilledColumns = filledColumnsCount;
-                    bestHeaderRowIndex = i;
-                }
-            }
-
-            const data = XLSX.utils.sheet_to_json(ws, { range: bestHeaderRowIndex, defval: "" });
-            const processed = processExcelData(data);
-            
-            if (processed.length > 0) {
-                allSheetsData[sheetName] = processed;
-                hasAnyData = true;
-            }
-        });
-
-        if (!hasAnyData) {
-            setError("لم يتم العثور على بيانات صالحة في أي ورقة عمل.");
-            setIsProcessing(false);
-            return;
-        }
-        
-        onDataLoaded(allSheetsData);
-        setIsProcessing(false);
-
       } catch (err) {
-        console.error(err);
-        setError("حدث خطأ أثناء قراءة الملف. تأكد من أن الملف صالح.");
+        setError("حدث خطأ أثناء قراءة الملف.");
+      } finally {
         setIsProcessing(false);
       }
     };
@@ -104,8 +114,35 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
       }
   };
 
-  const handleUseMock = () => {
-    onDataLoaded({ "بيانات تجريبية": generateMockData() });
+  // 2. Handle Default File (Fetch from public folder with Fallback)
+  const handleLoadDefaultData = async () => {
+    setError(null);
+    setIsProcessing(true);
+    
+    try {
+        // Attempt to fetch the file
+        const response = await fetch('./default_stations.xlsx');
+        
+        if (response.ok) {
+            // File exists, parse it
+            const arrayBuffer = await response.arrayBuffer();
+            parseExcelBuffer(arrayBuffer);
+        } else {
+            // File not found (404), fallback to generated mock data
+            console.warn("default_stations.xlsx not found, falling back to mock data.");
+            const mockData = generateMockData();
+            // mockData is now a Record<string, DeviceData[]>, so we pass it directly
+            onDataLoaded(mockData);
+        }
+        
+    } catch (err) {
+        console.error("Default data load error, using fallback:", err);
+        // Fallback on network error as well
+        const mockData = generateMockData();
+        onDataLoaded(mockData);
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   return (
@@ -153,16 +190,17 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
 
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
-            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-medium">أو للتجربة السريعة</span>
+            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-medium">البيانات الافتراضية</span>
             <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
           </div>
 
           <button 
-            onClick={handleUseMock}
-            className="w-full py-3.5 px-4 bg-secondary dark:bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-600 dark:hover:bg-amber-500 transition flex items-center justify-center gap-2"
+            onClick={handleLoadDefaultData}
+            disabled={isProcessing}
+            className="w-full py-3.5 px-4 bg-secondary dark:bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-600 dark:hover:bg-amber-500 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <PlayCircle size={20} />
-            استخدام بيانات تجريبية
+            {isProcessing ? <Loader2 size={20} className="animate-spin" /> : <Database size={20} />}
+            بيانات المحطات
           </button>
         </div>
       </div>
