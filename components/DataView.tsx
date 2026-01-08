@@ -251,6 +251,7 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
     </div>
   );
 
+  // UPDATED: InteractiveCheckBox to be print-safe
   const InteractiveCheckBox: React.FC<{ uniqueId: string, label: string, isCheckedOverride?: boolean, className?: string, children?: React.ReactNode }> = ({ uniqueId, label, isCheckedOverride, className = "", children }) => {
       const manualState = reportCheckboxes[uniqueId]?.[label] || false;
       const isChecked = isCheckedOverride !== undefined ? isCheckedOverride : manualState;
@@ -259,8 +260,8 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
               className={`flex items-center gap-1 mb-0.5 cursor-pointer group ${className}`}
               onClick={() => isCheckedOverride === undefined && toggleReportCheckbox(uniqueId, label)}
           >
-              <div className={`w-3.5 h-3.5 border border-black flex-shrink-0 bg-white flex items-center justify-center transition-colors ${isChecked ? 'bg-black' : ''}`}>
-                  {isChecked && <Check size={12} className="text-white font-bold" strokeWidth={4} />}
+              <div className={`w-3.5 h-3.5 border border-black flex-shrink-0 flex items-center justify-center transition-colors ${isChecked ? 'bg-black print:bg-white' : 'bg-white'}`}>
+                  {isChecked && <Check size={12} className="text-white print:text-black font-bold" strokeWidth={4} />}
               </div>
               <span className="text-black font-semibold text-[10px] leading-tight group-hover:text-primary transition-colors">{label}</span>
               {children}
@@ -477,6 +478,7 @@ const DataView: React.FC<DataViewProps> = ({ data, filters, sheetNames, activeSh
                     body { background-color: white !important; }
                     .print\\:hidden { display: none !important; }
                     .print\\:bg-white { background-color: white !important; }
+                    .print\\:text-black { color: black !important; }
                 }
             `}</style>
         </div>
