@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, Database, AlertTriangle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Database, AlertTriangle, Loader2, CloudDownload } from 'lucide-react';
 import { processExcelData, generateMockData } from '../utils/excelHelpers';
 import { DeviceData } from '../types';
 
@@ -12,6 +12,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Google Sheet Export URL
+  const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1RF6cQZjuR-X_9m01u91rX8Hsts-Qu9GK/export?format=xlsx";
 
   // Core function to parse ArrayBuffer (used by both File Upload and Default File)
   const parseExcelBuffer = (arrayBuffer: ArrayBuffer) => {
@@ -114,32 +117,30 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
       }
   };
 
-  // 2. Handle Default File (Fetch from public folder with Fallback)
+  // 2. Handle Default File (Fetch from Google Drive)
   const handleLoadDefaultData = async () => {
     setError(null);
     setIsProcessing(true);
     
     try {
-        // Attempt to fetch the file
-        const response = await fetch('./default_stations.xlsx');
+        // Attempt to fetch directly from Google Drive
+        console.log("Fetching from Google Drive...");
+        const response = await fetch(GOOGLE_SHEET_URL);
         
         if (response.ok) {
-            // File exists, parse it
             const arrayBuffer = await response.arrayBuffer();
             parseExcelBuffer(arrayBuffer);
         } else {
-            // File not found (404), fallback to generated mock data
-            console.warn("default_stations.xlsx not found, falling back to mock data.");
-            const mockData = generateMockData();
-            // mockData is now a Record<string, DeviceData[]>, so we pass it directly
-            onDataLoaded(mockData);
+            throw new Error(`Google Drive fetch failed: ${response.statusText}`);
         }
         
     } catch (err) {
-        console.error("Default data load error, using fallback:", err);
-        // Fallback on network error as well
+        console.error("Cloud load error, falling back to local mock data:", err);
+        // Fallback to the massive generated mock data (which contains the same info as backup)
         const mockData = generateMockData();
         onDataLoaded(mockData);
+        // Optionally show a warning that we used cached data
+        // setError("تعذر الاتصال بجوجل درايف، تم تحميل النسخة المحلية.");
     } finally {
         setIsProcessing(false);
     }
@@ -190,7 +191,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
 
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
-            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-medium">البيانات الافتراضية</span>
+            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-medium">قاعدة البيانات السحابية</span>
             <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
           </div>
 
@@ -208,9 +209,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onDataLoaded }) => {
       <div className="mt-8 p-5 bg-blue-50 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 rounded-2xl text-sm text-gray-600 dark:text-gray-400 max-w-md w-full text-right shadow-sm">
         <p className="font-bold mb-2 text-blue-800 dark:text-blue-300">مميزات جديدة:</p>
         <ul className="list-disc list-inside space-y-1 marker:text-blue-500">
+            <li>الربط المباشر مع ملف Google Sheets</li>
             <li>دعم الوضع الليلي (Dark Mode)</li>
             <li>تحسين استيراد الجداول تلقائياً</li>
-            <li>واجهة متجاوبة مع الجوال</li>
         </ul>
       </div>
     </div>
