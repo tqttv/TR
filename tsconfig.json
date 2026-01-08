@@ -26,4 +26,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   }
+   "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["node_modules/@types"]
+  }
 }
